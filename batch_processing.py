@@ -105,11 +105,24 @@ class BatchProcessor(QThread):
     def process_single_image(self, input_path: str, output_folder: str) -> bool:
         """處理單張圖片"""
         try:
-            # 讀取圖片
-            img = cv2.imread(input_path)
+            # 使用 IMREAD_UNCHANGED 來保留 alpha 通道
+            img = cv2.imread(input_path, cv2.IMREAD_UNCHANGED)
             if img is None:
                 print(f"無法讀取圖片: {input_path}")
                 return False
+            
+            # 檢查是否有 alpha 通道，如果沒有則添加一個完全不透明的 alpha 通道
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                # BGR 圖像，添加 alpha 通道
+                height, width = img.shape[:2]
+                alpha_channel = np.full((height, width, 1), 255, dtype=np.uint8)
+                img = np.concatenate([img, alpha_channel], axis=2)
+            elif len(img.shape) == 2:
+                # 灰階圖像，轉換為 BGRA
+                height, width = img.shape
+                bgr_image = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+                alpha_channel = np.full((height, width, 1), 255, dtype=np.uint8)
+                img = np.concatenate([bgr_image, alpha_channel], axis=2)
             
             height, width = img.shape[:2]
             
@@ -127,8 +140,17 @@ class BatchProcessor(QThread):
             # 裁切圖片
             img_cropped = img[y1:y2, x1:x2].copy()
             
-            # 轉換為 RGB 格式
-            img_rgb = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
+            # 處理圖像數據，支持 alpha 通道
+            if img.shape[2] == 4:
+                # BGRA 圖像，提取 BGR 和 alpha 通道
+                img_bgr_cropped = img_cropped[:, :, :3]
+                original_alpha_cropped = img_cropped[:, :, 3]
+                img_rgb = cv2.cvtColor(img_bgr_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
+            else:
+                # BGR 圖像，正常處理
+                img_bgr_cropped = img_cropped
+                original_alpha_cropped = None
+                img_rgb = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
             
             # 執行分析
             channel_type = self.parameters.get("channel", "RGB")
@@ -148,12 +170,13 @@ class BatchProcessor(QThread):
                 None,  # 已經裁切過了
                 noise_removal_area,
                 dilate_size,
-                erode_size
+                erode_size,
+                original_alpha_cropped  # 傳遞 alpha 通道
             )
             
             # 創建 RGBA 圖片（將綠色通道作為 alpha）
             alpha = result_img[:, :, 1]
-            rgb = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB)
+            rgb = cv2.cvtColor(img_bgr_cropped, cv2.COLOR_BGR2RGB)
             rgba = np.dstack([rgb, alpha])
             
             # 生成輸出檔案路徑

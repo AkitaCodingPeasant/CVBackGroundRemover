@@ -202,7 +202,8 @@ def analyze_image(
     crop_coords: Tuple[int, int, int, int] = None,
     noise_removal_area: int = 100,
     dilate_size: int = 0,
-    erode_size: int = 0
+    erode_size: int = 0,
+    original_alpha: npt.NDArray[np.uint8] = None
 ) -> npt.NDArray[np.uint8]:
     """分析圖像並生成結果
     Args:
@@ -216,14 +217,7 @@ def analyze_image(
         noise_removal_area: 去雜點最小面積
         dilate_size: 擴張核心大小
         erode_size: 侵蝕核心大小
-    Returns:
-        channel_type: 顏色通道類型
-        fg_threshold: 前景閾值 (0-100)
-        bg_threshold: 背景閾值 (0-100)
-        crop_coords: 裁切座標 (x1, y1, x2, y2)，如果為 None 則不裁切
-        noise_removal_area: 去雜點最小面積
-        dilate_size: 擴張核心大小
-        erode_size: 侵蝕核心大小
+        original_alpha: 原始圖像的 alpha 通道，如果有的話
     Returns:
         result_img: 分析結果圖像，形狀為 (H, W, 3)
     """
@@ -234,6 +228,12 @@ def analyze_image(
     
     h, w, _ = img_rgb.shape
     pixels = img_rgb.reshape(-1, 3)  # shape (P,3)
+    
+    # 如果有原始 alpha 通道，創建像素遮罩
+    alpha_mask = None
+    if original_alpha is not None:
+        # 將 alpha 通道重塑為 1D 陣列
+        alpha_mask = original_alpha.reshape(-1) > 0  # alpha > 0 的像素才參與計算
     
     # 建立前景顏色矩陣和背景顏色矩陣
     if len(fg_color_blocks) > 0:
@@ -258,6 +258,10 @@ def analyze_image(
     
     # 轉換為百分比 (0-100)
     intensity_percent = fg_ratio * 100.0
+    
+    # 如果有 alpha 遮罩，將 alpha 為 0 的像素設置為背景（100%）
+    if alpha_mask is not None:
+        intensity_percent[~alpha_mask] = 100.0  # alpha 為 0 的像素設為背景
     
     # 限制範圍到 [0, 100]
     intensity_percent = np.clip(intensity_percent, 0.0, 100.0)

@@ -647,7 +647,21 @@ class ImageApp(QWidget):
             import os
             self.original_filename = os.path.splitext(os.path.basename(path))[0]
             
-            self.image = cv2.imread(path)
+            # 使用 IMREAD_UNCHANGED 來保留 alpha 通道
+            self.image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+            
+            # 檢查是否有 alpha 通道，如果沒有則添加一個完全不透明的 alpha 通道
+            if len(self.image.shape) == 3 and self.image.shape[2] == 3:
+                # BGR 圖像，添加 alpha 通道
+                height, width = self.image.shape[:2]
+                alpha_channel = np.full((height, width, 1), 255, dtype=np.uint8)
+                self.image = np.concatenate([self.image, alpha_channel], axis=2)
+            elif len(self.image.shape) == 2:
+                # 灰階圖像，轉換為 BGRA
+                height, width = self.image.shape
+                bgr_image = cv2.cvtColor(self.image, cv2.COLOR_GRAY2BGR)
+                alpha_channel = np.full((height, width, 1), 255, dtype=np.uint8)
+                self.image = np.concatenate([bgr_image, alpha_channel], axis=2)
             
             # 設置裁切座標的預設值為圖片的完整尺寸
             height, width = self.image.shape[:2]
@@ -727,10 +741,22 @@ class ImageApp(QWidget):
         y2 = max(y1 + 1, min(y2, height))
         
         # 將圖片轉換為 RGB 並轉為浮點數
-        img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+        if self.image.shape[2] == 4:
+            # BGRA 圖像，提取 BGR 和 alpha 通道
+            img_bgr = self.image[:, :, :3]
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB).astype(np.float64)
+            # 提取 alpha 通道用於後續處理
+            original_alpha = self.image[:, :, 3]
+        else:
+            # BGR 圖像，正常處理
+            img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+            original_alpha = None
         
         # 裁切原始圖片並顯示
-        cropped_original = self.image[y1:y2, x1:x2]
+        if self.image.shape[2] == 4:
+            cropped_original = self.image[y1:y2, x1:x2]
+        else:
+            cropped_original = self.image[y1:y2, x1:x2]
         self.display_original_image(cropped_original)
         
         # 使用分析函數，包含閾值、裁切參數，但不包含去雜點和邊緣處理
@@ -738,13 +764,19 @@ class ImageApp(QWidget):
         # 不使用邊緣處理參數，設為 0
         dilate_size = 0
         erode_size = 0
-        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size)
+        # 提取裁切後的 alpha 通道（如果有的話）
+        cropped_alpha = original_alpha[y1:y2, x1:x2] if original_alpha is not None else None
+        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size, cropped_alpha)
         
         # 儲存當前結果圖像用於檢視模式切換
         self.current_result_img = result_img
         
         # 顯示結果
-        self.display_result_image(cropped_original, result_img)
+        if self.image.shape[2] == 4:
+            cropped_original_display = cropped_original[:, :, :3]  # 只取 BGR 部分用於顯示
+        else:
+            cropped_original_display = cropped_original
+        self.display_result_image(cropped_original_display, result_img)
 
     def render_with_noise_removal(self):
         """按需渲染，包含去雜點功能"""
@@ -771,20 +803,35 @@ class ImageApp(QWidget):
         y2 = max(y1 + 1, min(y2, height))
         
         # 將圖片轉換為 RGB 並轉為浮點數
-        img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+        if self.image.shape[2] == 4:
+            # BGRA 圖像，提取 BGR 和 alpha 通道
+            img_bgr = self.image[:, :, :3]
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB).astype(np.float64)
+            # 提取 alpha 通道用於後續處理
+            original_alpha = self.image[:, :, 3]
+        else:
+            # BGR 圖像，正常處理
+            img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+            original_alpha = None
         
         # 使用分析函數，包含所有參數（包括去雜點）
         crop_coords = (x1, y1, x2, y2)
         dilate_size = self.dilate_slider.value()
         erode_size = self.erode_slider.value()
-        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size)
+        # 提取裁切後的 alpha 通道（如果有的話）
+        cropped_alpha = original_alpha[y1:y2, x1:x2] if original_alpha is not None else None
+        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size, cropped_alpha)
         
         # 儲存當前結果圖像用於檢視模式切換
         self.current_result_img = result_img
         
         # 顯示結果
         cropped_original = self.image[y1:y2, x1:x2]
-        self.display_result_image(cropped_original, result_img)
+        if self.image.shape[2] == 4:
+            cropped_original_display = cropped_original[:, :, :3]  # 只取 BGR 部分用於顯示
+        else:
+            cropped_original_display = cropped_original
+        self.display_result_image(cropped_original_display, result_img)
 
     def render_with_edge_processing(self):
         """按需渲染，包含邊緣處理功能"""
@@ -814,27 +861,52 @@ class ImageApp(QWidget):
         
         # 裁切原始圖片並顯示
         cropped_original = self.image[y1:y2, x1:x2]
-        self.display_original_image(cropped_original)
+        self.display_original_image(cropped_original)  # 傳遞完整的圖像包括 alpha 通道
         
         # 將圖片轉換為 RGB 並轉為浮點數
-        img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+        if self.image.shape[2] == 4:
+            # BGRA 圖像，提取 BGR 和 alpha 通道
+            img_bgr = self.image[:, :, :3]
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB).astype(np.float64)
+            # 提取 alpha 通道用於後續處理
+            original_alpha = self.image[:, :, 3]
+        else:
+            # BGR 圖像，正常處理
+            img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+            original_alpha = None
         
         # 使用分析函數，包含所有參數（包括邊緣處理）
         crop_coords = (x1, y1, x2, y2)
-        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size)
+        # 提取裁切後的 alpha 通道（如果有的話）
+        cropped_alpha = original_alpha[y1:y2, x1:x2] if original_alpha is not None else None
+        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size, cropped_alpha)
         
         # 儲存當前結果圖像用於檢視模式切換
         self.current_result_img = result_img
         
         # 顯示結果
-        self.display_result_image(cropped_original, result_img)
+        if self.image.shape[2] == 4:
+            cropped_original_display = cropped_original[:, :, :3]  # 只取 BGR 部分用於結果顯示
+        else:
+            cropped_original_display = cropped_original
+        self.display_result_image(cropped_original_display, result_img)
 
     def display_image(self, img, label):
         """顯示影像在 ZoomableLabel 上"""
-        rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_image.shape
-        bytes_per_line = ch * w
-        qimg = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888).copy()
+        # 檢查圖像是否有 alpha 通道
+        if len(img.shape) == 3 and img.shape[2] == 4:
+            # BGRA 圖像，轉換為 RGBA 用於顯示
+            rgba_image = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+            h, w, ch = rgba_image.shape
+            bytes_per_line = ch * w
+            qimg = QImage(rgba_image.data, w, h, bytes_per_line, QImage.Format_RGBA8888).copy()
+        else:
+            # BGR 圖像，正常處理
+            rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_image.shape
+            bytes_per_line = ch * w
+            qimg = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888).copy()
+        
         pix = QPixmap.fromImage(qimg)
         
         # 使用 ZoomableLabel 的 set_image 方法
@@ -930,8 +1002,12 @@ class ImageApp(QWidget):
         cropped_original = self.image[y1:y2, x1:x2]
         
         # 更新顯示
-        self.display_original_image(cropped_original)
-        self.display_result_image(cropped_original, self.current_result_img)
+        self.display_original_image(cropped_original)  # 傳遞完整的圖像包括 alpha 通道
+        if self.image.shape[2] == 4:
+            cropped_original_display = cropped_original[:, :, :3]  # 只取 BGR 部分用於結果顯示
+        else:
+            cropped_original_display = cropped_original
+        self.display_result_image(cropped_original_display, self.current_result_img)
 
     def update_blur_parameters(self):
         """當高斯模糊參數改變時更新顯示"""
@@ -954,7 +1030,7 @@ class ImageApp(QWidget):
         cropped_original = self.image[y1:y2, x1:x2]
         
         # 只更新原始圖像顯示
-        self.display_original_image(cropped_original)
+        self.display_original_image(cropped_original)  # 傳遞完整的圖像包括 alpha 通道
 
     def export_image(self):
         if self.image is None:
@@ -970,6 +1046,19 @@ class ImageApp(QWidget):
         y2 = self.y2_spinbox.value()
         # 裁切原始圖片
         img_cropped = self.image[y1:y2, x1:x2].copy()
+        
+        # 處理圖像數據，支持 alpha 通道
+        if self.image.shape[2] == 4:
+            # BGRA 圖像，提取 BGR 和 alpha 通道
+            img_bgr_cropped = img_cropped[:, :, :3]
+            original_alpha_cropped = img_cropped[:, :, 3]
+            img_rgb_cropped = cv2.cvtColor(img_bgr_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
+        else:
+            # BGR 圖像，正常處理
+            img_bgr_cropped = img_cropped
+            original_alpha_cropped = None
+            img_rgb_cropped = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
+        
         # 取得預覽圖像（分析後結果），包含去雜點參數
         selected_channel = self.channel_combo.currentText()
         fg_threshold = self.fg_threshold_slider.value()
@@ -977,10 +1066,11 @@ class ImageApp(QWidget):
         noise_removal_area = self.noise_removal_slider.value()  # 輸出時使用去雜點參數
         dilate_size = self.dilate_slider.value()
         erode_size = self.erode_slider.value()
-        result_img = analyze_image(cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float64), self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, None, noise_removal_area, dilate_size, erode_size)
+        result_img = analyze_image(img_rgb_cropped, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, None, noise_removal_area, dilate_size, erode_size, original_alpha_cropped)
+        
         # 將 G 通道轉為 alpha 通道
         alpha = result_img[:, :, 1]
-        rgb = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(img_bgr_cropped, cv2.COLOR_BGR2RGB)
         rgba = np.dstack([rgb, alpha])
         # 儲存檔案
         path, _ = QFileDialog.getSaveFileName(self, "儲存圖片", default_filename, "PNG Files (*.png)")
