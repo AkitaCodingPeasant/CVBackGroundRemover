@@ -36,7 +36,7 @@
 
 1. **下載專案**
 ```bash
-git clone <repository-url>
+git clone https://github.com/AkitaCodingPeasant/CVBackGroundRemover.git
 cd BackgroundRemove
 ```
 
@@ -156,35 +156,3 @@ BackgroundRemove/
 | 擴張大小 | 0-20像素 | 邊緣擴張操作的核心大小 |
 | 侵蝕大小 | 0-20像素 | 邊緣侵蝕操作的核心大小 |
 | 模糊核心 | 1-99 | 高斯模糊的核心大小 |
-
-## 🚀 效能最佳化
-
-### Numba 加速函數
-- `compute_euclidean_distance`: 歐幾里得距離計算
-- `compute_cosine_similarity`: 餘弦相似度計算
-- `create_result_image_with_thresholds`: 結果圖片生成
-- `remove_noise_components`: 雜點移除
-- `apply_morphological_operations`: 邊緣擴張/侵蝕處理
-
-### 記憶體使用
-- 使用 `dtype=np.uint8` 減少記憶體佔用
-- 避免不必要的圖片複製
-- 及時釋放大型陣列
-
-## ❓ 常見問題
-
-### Q: 處理速度很慢怎麼辦？
-A: 確保已安裝 numba 套件，首次使用時 JIT 編譯需要時間，後續會變快。
-
-### Q: 去背效果不理想？
-A: 嘗試：
-- 切換不同的顏色通道（HSV 通常效果較好）
-- 調整前景/背景閾值
-- 增加更多顏色樣本點
-- 使用雜點移除功能
-
-### Q: 批量處理時程式卡住？
-A: 批量處理使用背景執行緒，介面應該保持響應。如果遇到問題可點擊停止按鈕。
-
-### Q: 支援哪些圖片格式？
-A: 目前支援 PNG、JPG、JPEG、BMP 格式，建議使用 PNG 以保持透明度。
