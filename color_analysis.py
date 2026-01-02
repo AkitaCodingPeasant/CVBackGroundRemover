@@ -203,7 +203,8 @@ def analyze_image(
     noise_removal_area: int = 100,
     dilate_size: int = 0,
     erode_size: int = 0,
-    original_alpha: npt.NDArray[np.uint8] = None
+    original_alpha: npt.NDArray[np.uint8] = None,
+    hole_removal_area: int = 0
 ) -> npt.NDArray[np.uint8]:
     """分析圖像並生成結果
     Args:
@@ -218,6 +219,7 @@ def analyze_image(
         dilate_size: 擴張核心大小
         erode_size: 侵蝕核心大小
         original_alpha: 原始圖像的 alpha 通道，如果有的話
+        hole_removal_area: 去空洞最小面積
     Returns:
         result_img: 分析結果圖像，形狀為 (H, W, 3)
     """
@@ -267,6 +269,6 @@ def analyze_image(
     intensity_percent = np.clip(intensity_percent, 0.0, 100.0)
     
     # 生成結果圖像
-    result_img = create_result_image_with_thresholds(intensity_percent, h, w, fg_threshold, bg_threshold, noise_removal_area, dilate_size, erode_size)
+    result_img = create_result_image_with_thresholds(intensity_percent, h, w, fg_threshold, bg_threshold, noise_removal_area, dilate_size, erode_size, hole_removal_area)
     
     return result_img

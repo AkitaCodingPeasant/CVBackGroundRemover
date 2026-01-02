@@ -267,9 +267,10 @@ def create_result_image_with_thresholds(
     bg_threshold: float,
     noise_removal_area: int = 100,
     dilate_size: int = 0,
-    erode_size: int = 0
+    erode_size: int = 0,
+    hole_removal_area: int = 0
 ) -> npt.NDArray[np.uint8]:
-    """生成結果圖像，支援前景背景閾值、去雜點和邊緣處理
+    """生成結果圖像，支援前景背景閾值、去雜點、邊緣處理和空洞移除
     Args:
         intensity: 強度值陣列，範圍 [0, 100]
         h: 圖像高度
@@ -279,10 +280,11 @@ def create_result_image_with_thresholds(
         noise_removal_area: 去雜點最小面積
         dilate_size: 擴張核心大小
         erode_size: 侵蝕核心大小
+        hole_removal_area: 去空洞最小面積
     Returns:
         結果圖像陣列，形狀為 (h, w, 3)
     """
-    from noise_removal import remove_noise_components  # 避免循環導入
+    from noise_removal import remove_noise_components, remove_hole_components  # 避免循環導入
     
     intensity_2d = intensity.reshape(h, w)
     
@@ -295,12 +297,16 @@ def create_result_image_with_thresholds(
     else:
         cleaned_alpha = alpha_channel
     
+    # 應用去空洞處理
+    if hole_removal_area > 0:
+        cleaned_alpha = remove_hole_components(cleaned_alpha, hole_removal_area)
+    
     # 應用邊緣處理（擴張和侵蝕）
     if dilate_size > 0 or erode_size > 0:
         cleaned_alpha = apply_morphological_operations(cleaned_alpha, dilate_size, erode_size)
     
     # 使用 numba 優化的 alpha 更新（只有在進行了處理時才更新）
-    if noise_removal_area > 0 or dilate_size > 0 or erode_size > 0:
+    if noise_removal_area > 0 or hole_removal_area > 0 or dilate_size > 0 or erode_size > 0:
         result_img = _update_result_with_cleaned_alpha_numba(result_img, cleaned_alpha, h, w)
     
     return result_img

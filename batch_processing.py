@@ -157,6 +157,7 @@ class BatchProcessor(QThread):
             fg_threshold = self.parameters.get("fg_threshold", 20.0)
             bg_threshold = self.parameters.get("bg_threshold", 80.0)
             noise_removal_area = self.parameters.get("noise_removal_area", 0)
+            hole_removal_area = self.parameters.get("hole_removal_area", 0)
             dilate_size = self.parameters.get("dilate_size", 0)
             erode_size = self.parameters.get("erode_size", 0)
             
@@ -171,7 +172,8 @@ class BatchProcessor(QThread):
                 noise_removal_area,
                 dilate_size,
                 erode_size,
-                original_alpha_cropped  # 傳遞 alpha 通道
+                original_alpha_cropped,  # 傳遞 alpha 通道
+                hole_removal_area  # 傳遞空洞移除參數
             )
             
             # 創建 RGBA 圖片（將綠色通道作為 alpha）
@@ -198,7 +200,7 @@ def validate_batch_parameters(parameters: dict, fg_color_blocks: List[Any], bg_c
     """驗證批量處理參數"""
     
     # 檢查必要參數
-    required_params = ["channel", "fg_threshold", "bg_threshold", "noise_removal_area", "dilate_size", "erode_size"]
+    required_params = ["channel", "fg_threshold", "bg_threshold", "noise_removal_area", "hole_removal_area", "dilate_size", "erode_size"]
     for param in required_params:
         if param not in parameters:
             return False, f"缺少必要參數: {param}"

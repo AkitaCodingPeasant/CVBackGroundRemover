@@ -347,13 +347,13 @@ class ImageApp(QWidget):
         # 移除自動更新連接
         
         self.noise_removal_spinbox = QSpinBox()
-        self.noise_removal_spinbox.setRange(0, 99)
+        self.noise_removal_spinbox.setRange(0, 9999)  # 提高上限到 9999
         self.noise_removal_spinbox.setValue(0)
         # 移除自動更新連接
         
         # 連接滑桿和數字框（保持同步，但不觸發渲染）
         self.noise_removal_slider.valueChanged.connect(self.noise_removal_spinbox.setValue)
-        self.noise_removal_spinbox.valueChanged.connect(self.noise_removal_slider.setValue)
+        self.noise_removal_spinbox.valueChanged.connect(self.sync_noise_removal_slider)
         
         noise_removal_layout = QHBoxLayout()
         noise_removal_layout.addWidget(self.noise_removal_slider)
@@ -362,6 +362,30 @@ class ImageApp(QWidget):
         # 新增去雜點渲染按鈕
         self.btn_render_noise_removal = QPushButton("套用去雜點")
         self.btn_render_noise_removal.clicked.connect(self.render_with_noise_removal)
+
+        # 去空洞參數控制項
+        hole_removal_label = QLabel("去空洞面積:")
+        self.hole_removal_slider = QSlider(Qt.Horizontal)
+        self.hole_removal_slider.setRange(0, 1000)
+        self.hole_removal_slider.setValue(0)
+        # 移除自動更新連接
+        
+        self.hole_removal_spinbox = QSpinBox()
+        self.hole_removal_spinbox.setRange(0, 9999)  # 提高上限到 9999
+        self.hole_removal_spinbox.setValue(0)
+        # 移除自動更新連接
+        
+        # 連接滑桿和數字框（保持同步，但不觸發渲染）
+        self.hole_removal_slider.valueChanged.connect(self.hole_removal_spinbox.setValue)
+        self.hole_removal_spinbox.valueChanged.connect(self.sync_hole_removal_slider)
+        
+        hole_removal_layout = QHBoxLayout()
+        hole_removal_layout.addWidget(self.hole_removal_slider)
+        hole_removal_layout.addWidget(self.hole_removal_spinbox)
+        
+        # 新增去空洞渲染按鈕
+        self.btn_render_hole_removal = QPushButton("套用去空洞")
+        self.btn_render_hole_removal.clicked.connect(self.render_with_hole_removal)
 
         # 邊緣處理參數控制項
         edge_label = QLabel("邊緣處理:")
@@ -373,12 +397,12 @@ class ImageApp(QWidget):
         self.dilate_slider.setValue(0)
         
         self.dilate_spinbox = QSpinBox()
-        self.dilate_spinbox.setRange(0, 20)
+        self.dilate_spinbox.setRange(0, 999)  # 提高上限到 999
         self.dilate_spinbox.setValue(0)
         
         # 連接擴張滑桿和數字框
         self.dilate_slider.valueChanged.connect(self.dilate_spinbox.setValue)
-        self.dilate_spinbox.valueChanged.connect(self.dilate_slider.setValue)
+        self.dilate_spinbox.valueChanged.connect(self.sync_dilate_slider)
         
         dilate_layout = QHBoxLayout()
         dilate_layout.addWidget(dilate_label)
@@ -392,12 +416,12 @@ class ImageApp(QWidget):
         self.erode_slider.setValue(0)
         
         self.erode_spinbox = QSpinBox()
-        self.erode_spinbox.setRange(0, 20)
+        self.erode_spinbox.setRange(0, 999)  # 提高上限到 999
         self.erode_spinbox.setValue(0)
         
         # 連接侵蝕滑桿和數字框
         self.erode_slider.valueChanged.connect(self.erode_spinbox.setValue)
-        self.erode_spinbox.valueChanged.connect(self.erode_slider.setValue)
+        self.erode_spinbox.valueChanged.connect(self.sync_erode_slider)
         
         erode_layout = QHBoxLayout()
         erode_layout.addWidget(erode_label)
@@ -542,6 +566,11 @@ class ImageApp(QWidget):
         right_layout.addWidget(noise_removal_label)
         right_layout.addLayout(noise_removal_layout)
         right_layout.addWidget(self.btn_render_noise_removal)
+        
+        # 去空洞控制
+        right_layout.addWidget(hole_removal_label)
+        right_layout.addLayout(hole_removal_layout)
+        right_layout.addWidget(self.btn_render_hole_removal)
         right_layout.addSpacing(10)
         
         # 邊緣處理控制
@@ -639,6 +668,30 @@ class ImageApp(QWidget):
     def sync_to_original(self, scale_factor, offset):
         """將結果圖片的縮放和偏移同步到原始圖片"""
         self.label_original.sync_from_other(scale_factor, offset)
+    
+    def sync_noise_removal_slider(self, value):
+        """同步去雜點數字框到滑桿，但只在滑桿範圍內才更新滑桿"""
+        if value <= self.noise_removal_slider.maximum():
+            self.noise_removal_slider.setValue(value)
+        # 數字框的值總是會更新，即使超過滑桿範圍
+    
+    def sync_hole_removal_slider(self, value):
+        """同步去空洞數字框到滑桿，但只在滑桿範圍內才更新滑桿"""
+        if value <= self.hole_removal_slider.maximum():
+            self.hole_removal_slider.setValue(value)
+        # 數字框的值總是會更新，即使超過滑桿範圍
+    
+    def sync_dilate_slider(self, value):
+        """同步擴張數字框到滑桿，但只在滑桿範圍內才更新滑桿"""
+        if value <= self.dilate_slider.maximum():
+            self.dilate_slider.setValue(value)
+        # 數字框的值總是會更新，即使超過滑桿範圍
+    
+    def sync_erode_slider(self, value):
+        """同步侵蝕數字框到滑桿，但只在滑桿範圍內才更新滑桿"""
+        if value <= self.erode_slider.maximum():
+            self.erode_slider.setValue(value)
+        # 數字框的值總是會更新，即使超過滑桿範圍
     
     def import_image(self):
         path, _ = QFileDialog.getOpenFileName(self, "選擇圖片", "", "Images (*.png *.jpg *.jpeg *.bmp)")
@@ -821,6 +874,62 @@ class ImageApp(QWidget):
         # 提取裁切後的 alpha 通道（如果有的話）
         cropped_alpha = original_alpha[y1:y2, x1:x2] if original_alpha is not None else None
         result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size, cropped_alpha)
+        
+        # 儲存當前結果圖像用於檢視模式切換
+        self.current_result_img = result_img
+        
+        # 顯示結果
+        cropped_original = self.image[y1:y2, x1:x2]
+        if self.image.shape[2] == 4:
+            cropped_original_display = cropped_original[:, :, :3]  # 只取 BGR 部分用於顯示
+        else:
+            cropped_original_display = cropped_original
+        self.display_result_image(cropped_original_display, result_img)
+
+    def render_with_hole_removal(self):
+        """按需渲染，包含去空洞功能"""
+        if self.image is None:
+            return
+        
+        # 獲取選定的顏色通道和閾值參數
+        selected_channel = self.channel_combo.currentText()
+        fg_threshold = self.fg_threshold_slider.value()
+        bg_threshold = self.bg_threshold_slider.value()
+        noise_removal_area = self.noise_removal_slider.value()
+        hole_removal_area = self.hole_removal_slider.value()  # 使用去空洞參數
+        
+        # 獲取裁切座標
+        x1 = self.x1_slider.value()
+        y1 = self.y1_slider.value()
+        x2 = self.x2_slider.value()
+        y2 = self.y2_slider.value()
+        
+        # 確保座標有效性
+        height, width = self.image.shape[:2]
+        x1 = max(0, min(x1, width - 1))
+        y1 = max(0, min(y1, height - 1))
+        x2 = max(x1 + 1, min(x2, width))
+        y2 = max(y1 + 1, min(y2, height))
+        
+        # 將圖片轉換為 RGB 並轉為浮點數
+        if self.image.shape[2] == 4:
+            # BGRA 圖像，提取 BGR 和 alpha 通道
+            img_bgr = self.image[:, :, :3]
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB).astype(np.float64)
+            # 提取 alpha 通道用於後續處理
+            original_alpha = self.image[:, :, 3]
+        else:
+            # BGR 圖像，正常處理
+            img_rgb = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB).astype(np.float64)
+            original_alpha = None
+        
+        # 使用分析函數，包含所有參數（包括去空洞）
+        crop_coords = (x1, y1, x2, y2)
+        dilate_size = self.dilate_slider.value()
+        erode_size = self.erode_slider.value()
+        # 提取裁切後的 alpha 通道（如果有的話）
+        cropped_alpha = original_alpha[y1:y2, x1:x2] if original_alpha is not None else None
+        result_img = analyze_image(img_rgb, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, crop_coords, noise_removal_area, dilate_size, erode_size, cropped_alpha, hole_removal_area)
         
         # 儲存當前結果圖像用於檢視模式切換
         self.current_result_img = result_img
@@ -1059,14 +1168,15 @@ class ImageApp(QWidget):
             original_alpha_cropped = None
             img_rgb_cropped = cv2.cvtColor(img_cropped, cv2.COLOR_BGR2RGB).astype(np.float64)
         
-        # 取得預覽圖像（分析後結果），包含去雜點參數
+        # 取得預覽圖像（分析後結果），包含去雜點和去空洞參數
         selected_channel = self.channel_combo.currentText()
         fg_threshold = self.fg_threshold_slider.value()
         bg_threshold = self.bg_threshold_slider.value()
         noise_removal_area = self.noise_removal_slider.value()  # 輸出時使用去雜點參數
         dilate_size = self.dilate_slider.value()
         erode_size = self.erode_slider.value()
-        result_img = analyze_image(img_rgb_cropped, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, None, noise_removal_area, dilate_size, erode_size, original_alpha_cropped)
+        hole_removal_area = self.hole_removal_slider.value()  # 輸出時使用去空洞參數
+        result_img = analyze_image(img_rgb_cropped, self.fg_color_blocks, self.bg_color_blocks, selected_channel, fg_threshold, bg_threshold, None, noise_removal_area, dilate_size, erode_size, original_alpha_cropped, hole_removal_area)
         
         # 將 G 通道轉為 alpha 通道
         alpha = result_img[:, :, 1]
@@ -1087,6 +1197,7 @@ class ImageApp(QWidget):
             "fg_threshold": self.fg_threshold_slider.value(),
             "bg_threshold": self.bg_threshold_slider.value(),
             "noise_removal_area": self.noise_removal_slider.value(),
+            "hole_removal_area": self.hole_removal_slider.value(),
             "dilate_size": self.dilate_slider.value(),
             "erode_size": self.erode_slider.value(),
             "original_view_mode": self.original_view_combo.currentText(),
@@ -1151,6 +1262,8 @@ class ImageApp(QWidget):
                 self.bg_threshold_slider.setValue(parameters["bg_threshold"])
             if "noise_removal_area" in parameters:
                 self.noise_removal_slider.setValue(parameters["noise_removal_area"])
+            if "hole_removal_area" in parameters:
+                self.hole_removal_slider.setValue(parameters["hole_removal_area"])
             
             # 套用邊緣處理設定
             if "dilate_size" in parameters:
@@ -1254,6 +1367,7 @@ class ImageApp(QWidget):
             "fg_threshold": self.fg_threshold_slider.value(),
             "bg_threshold": self.bg_threshold_slider.value(),
             "noise_removal_area": self.noise_removal_slider.value(),
+            "hole_removal_area": self.hole_removal_slider.value(),
             "dilate_size": self.dilate_slider.value(),
             "erode_size": self.erode_slider.value(),
             "original_view_mode": self.original_view_combo.currentText(),
@@ -1291,6 +1405,7 @@ class ImageApp(QWidget):
             f"- 前景閾值：{parameters['fg_threshold']}%\n"
             f"- 背景閾值：{parameters['bg_threshold']}%\n"
             f"- 去雜點面積：{parameters['noise_removal_area']}\n"
+            f"- 去空洞面積：{parameters['hole_removal_area']}\n"
             f"- 裁切範圍：({parameters['x1']}, {parameters['y1']}) - ({parameters['x2']}, {parameters['y2']})\n\n"
             f"處理結果將輸出到：'{folder_path}-rmbg'\n\n"
             f"是否繼續？",
